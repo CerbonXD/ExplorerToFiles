@@ -101,20 +101,17 @@ def monitor_explorer_windows():
 
 
 def create_image():
-    """
-    Creates an icon image for the system tray.
-    """
-    width = 64
-    height = 64
-    # Background and foreground colors.
-    bg_color = (0, 0, 0)
-    fg_color = (255, 255, 255)
-    image = Image.new('RGB', (width, height), bg_color)
-    dc = ImageDraw.Draw(image)
-    # Draw a simple rectangle in the middle.
-    dc.rectangle(
-        (width // 4, height // 4, width * 3 // 4, height * 3 // 4),
-        fill=fg_color)
+    try:
+        image = Image.open("files_redirect_icon.png")
+
+    except Exception as e:
+        print("Error opening custom icon:", e)
+
+        # Fallback: create a simple default image if PNG can't be loaded.
+        image = Image.new('RGB', (64, 64), (0, 0, 0))
+        dc = ImageDraw.Draw(image)
+        dc.rectangle((16, 16, 48, 48), fill=(255, 255, 255))
+
     return image
 
 
