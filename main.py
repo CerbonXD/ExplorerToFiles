@@ -90,7 +90,6 @@ def main():
     global should_exit
 
     files_aumid = get_files_aumid()
-    processed_hwnds = set() # A set to keep track of already processed window handles.
 
     print("Monitoring for Explorer windows...")
     while not should_exit:
@@ -98,8 +97,6 @@ def main():
         for window in windows:
             try:
                 hwnd = window.HWND
-                if hwnd in processed_hwnds:
-                    continue
 
                 folder_path = get_path_from_window(window)
                 if not folder_path:
@@ -113,7 +110,6 @@ def main():
 
                 # Close the original Explorer window.
                 close_window_by_hwnd(hwnd)
-                processed_hwnds.add(hwnd)
 
             except Exception as inner_exc:
                 print("Error processing a window:", inner_exc)
