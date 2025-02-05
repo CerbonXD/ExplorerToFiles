@@ -5,9 +5,11 @@ import subprocess
 import time
 import json
 
-from win32api import ShellExecute
+from win32event import CreateMutex
+from win32api import ShellExecute, GetLastError
 from win32gui import PostMessage
 from win32con import WM_CLOSE
+from winerror import ERROR_ALREADY_EXISTS
 from win32com.client import Dispatch
 import pythoncom
 
@@ -119,9 +121,29 @@ def setup_tray():
     return icon
 
 
+def create_mutex():
+    """Create mutex to ensure single instance of the application."""
+    mutex_name = "ExplorerToFiles"
+    try:
+        mutex = CreateMutex(None, False, mutex_name)
+        if GetLastError() == ERROR_ALREADY_EXISTS:
+            return None
+
+        return mutex
+
+    except Exception as e:
+        logger.error(f"Error creating mutex: {e}")
+        return None
+
+
 def main():
     if getattr(sys, "frozen", False):
         logger.remove()
+
+    mutex = create_mutex()
+    if mutex is None:
+        logger.info("Application is already running. Exiting.")
+        sys.exit(0)
 
     monitor_thread = threading.Thread(target=monitor_explorer_windows)
     monitor_thread.daemon = True
