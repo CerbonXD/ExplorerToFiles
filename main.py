@@ -1,39 +1,41 @@
 import threading
 import subprocess
+import time
 import json
 
-import win32api
-import win32gui
-import win32con
-import win32com.client
+from win32api import ShellExecute
+from win32gui import PostMessage
+from win32con import WM_CLOSE
+from win32com.client import Dispatch
 
-import pystray
-from pystray import MenuItem as item
+from pystray import MenuItem, Icon
 from PIL import Image, ImageDraw
 
-# Global flag for stopping the monitor thread.
+
 should_exit = False
 
+
 def get_explorer_windows():
-    """
-    Uses the Shell.Application COM object to enumerate open shell windows.
-    Filters only windows that have the typical Explorer window class name.
-    """
-    shell = win32com.client.Dispatch("Shell.Application")
-    explorer_windows = []
-    for window in shell.Windows():
-        try:
-            hwnd = window.HWND
-            # Only process windows with class "CabinetWClass" (typical for Explorer)
-            class_name = win32gui.GetClassName(hwnd)
-            if class_name != "CabinetWClass":
-                continue
-            # Double-check that the process is explorer.exe
-            if window.FullName.lower().endswith("explorer.exe"):
-                explorer_windows.append(window)
-        except Exception:
-            continue
-    return explorer_windows
+    shell = Dispatch("Shell.Application")
+    return shell.Windows()
+
+
+def get_path_from_window(window):
+    try:
+        return window.Document.Folder.Self.Path
+
+    except Exception as e:
+        print("Cannot get Explorer folder path from window:", e)
+
+    return None
+
+
+def close_window_by_hwnd(hwnd):
+    try:
+        PostMessage(hwnd, WM_CLOSE, 0, 0)
+
+    except Exception as e:
+        print("Cannot close Explorer window:", e)
 
 
 def get_files_aumid():
@@ -58,67 +60,49 @@ def get_files_aumid():
     return None
 
 
-def get_path_from_window(window):
-    """
-    Retrieves the current folder path from an Explorer window.
-    Returns None if not available.
-    """
-    try:
-        return window.Document.Folder.Self.Path
-    except Exception:
-        return None
-
-
-def close_window_by_hwnd(hwnd):
-    """
-    Sends a WM_CLOSE message to the window with the given handle.
-    """
-    try:
-        win32gui.PostMessage(hwnd, win32con.WM_CLOSE, 0, 0)
-    except Exception as e:
-        print("Error closing window:", e)
-
-
 def launch_files_app(files_aumid, folder_path):
-    """
-    Launches the Files UWP app for the given folder path using its AUMID.
-    """
-    win32api.ShellExecute(0, 'open', fr'shell:AppsFolder\{files_aumid}', folder_path, None, 1)
+    try:
+        ShellExecute(0, 'open', fr'shell:AppsFolder\{files_aumid}', folder_path, None, 1)
+
+    except Exception as e:
+        print("Cannot launch Files app:", e)
 
 
-def main():
-    global should_exit
+def monitor_explorer_windows():
+    print("Monitoring Explorer windows...")
 
     files_aumid = get_files_aumid()
+    if files_aumid is None: return
 
-    print("Monitoring for Explorer windows...")
+    global should_exit
     while not should_exit:
         windows = get_explorer_windows()
+
         for window in windows:
             try:
                 hwnd = window.HWND
 
                 folder_path = get_path_from_window(window)
-                if not folder_path:
-                    continue
+                if folder_path is None: continue
+                if folder_path.startswith("::"):
+                    folder_path = ""
 
                 print(f"Detected Explorer window (HWND {hwnd}) with path: {folder_path}")
 
-                # Launch the Files app with the folder path.
                 launch_files_app(files_aumid, folder_path)
                 print(f"Launched Files app for folder: {folder_path}")
 
-                # Close the original Explorer window.
                 close_window_by_hwnd(hwnd)
 
-            except Exception as inner_exc:
-                print("Error processing a window:", inner_exc)
+            except Exception as e:
+                print("Error processing Explorer window:", e)
+
+        time.sleep(0.5)
 
 
 def create_image():
     """
     Creates an icon image for the system tray.
-    (You can replace this with any image of your choice.)
     """
     width = 64
     height = 64
@@ -133,32 +117,30 @@ def create_image():
         fill=fg_color)
     return image
 
+
 def on_exit(icon):
-    """
-    Callback for the tray menu's "Exit" option.
-    """
     global should_exit
     should_exit = True
     icon.stop()
 
+
 def setup_tray():
-    """
-    Sets up and returns a pystray Icon instance with an "Exit" menu item.
-    """
     image = create_image()
-    menu = (item('Exit', on_exit),)
-    icon = pystray.Icon("FilesRedirector", image, "Files Redirector", menu)
+    menu = (MenuItem('Exit', on_exit),)
+    icon = Icon("FilesRedirector", image, "Files Redirector", menu)
     return icon
 
-if __name__ == "__main__":
-    # Start the monitoring thread.
-    monitor_thread = threading.Thread(target=main)
+
+def main():
+    monitor_thread = threading.Thread(target=monitor_explorer_windows)
     monitor_thread.daemon = True
     monitor_thread.start()
 
-    # Set up and run the system tray icon.
     tray_icon = setup_tray()
     tray_icon.run()
 
-    # Optionally join the monitor thread on exit.
     monitor_thread.join()
+
+
+if __name__ == "__main__":
+    main()
