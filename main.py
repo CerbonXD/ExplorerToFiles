@@ -115,7 +115,7 @@ def on_exit(icon):
 def setup_tray():
     image = create_image()
     menu = (MenuItem('Exit', on_exit),)
-    icon = Icon("FilesRedirector", image, "Files Redirector", menu)
+    icon = Icon("Explorer to Files", image, "Explorer to Files", menu)
     return icon
 
 
