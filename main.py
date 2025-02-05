@@ -12,11 +12,10 @@ from pystray import MenuItem, Icon
 from PIL import Image, ImageDraw
 
 
-should_exit = False
+exit_event = threading.Event()
 
 
-def get_explorer_windows():
-    shell = Dispatch("Shell.Application")
+def get_explorer_windows(shell):
     return shell.Windows()
 
 
@@ -74,9 +73,10 @@ def monitor_explorer_windows():
     files_aumid = get_files_aumid()
     if files_aumid is None: return
 
-    global should_exit
-    while not should_exit:
-        windows = get_explorer_windows()
+    shell = Dispatch("Shell.Application")
+
+    while not exit_event.is_set():
+        windows = get_explorer_windows(shell)
 
         for window in windows:
             try:
@@ -116,8 +116,7 @@ def create_image():
 
 
 def on_exit(icon):
-    global should_exit
-    should_exit = True
+    exit_event.set()
     icon.stop()
 
 
