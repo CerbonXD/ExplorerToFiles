@@ -1,4 +1,7 @@
 import threading
+import subprocess
+import json
+
 import win32api
 import win32gui
 import win32con
@@ -33,6 +36,34 @@ def get_explorer_windows():
     return explorer_windows
 
 
+def get_files_aumid():
+    """
+    Automatically retrieves the AUMID of the Files app.
+    It runs PowerShell's Get-StartApps command, converts the output to JSON,
+    and then searches for an app with the name "Files" (case-insensitive).
+    Returns the AUMID as a string or None if not found.
+    """
+    try:
+        # Run PowerShell to get the list of Start apps in JSON format.
+        cmd = ['powershell.exe', '-NoProfile', '-Command', 'Get-StartApps | ConvertTo-Json']
+        result = subprocess.run(cmd, capture_output=True, text=True, check=True)
+        output = result.stdout.strip()
+        # Parse the JSON output.
+        apps = json.loads(output)
+        # If only one app is returned, wrap it in a list.
+        if isinstance(apps, dict):
+            apps = [apps]
+        # Look for an app whose name is "Files" (ignoring case).
+        for app in apps:
+            name = app.get("Name", "").strip().lower()
+            if name == "files":  # or use: if "files" in name:
+                return app.get("AppID")
+        print("Files app not found in the output of Get-StartApps.")
+    except Exception as e:
+        print("Error retrieving Files AUMID:", e)
+    return None
+
+
 def get_path_from_window(window):
     """
     Retrieves the current folder path from an Explorer window.
@@ -64,7 +95,7 @@ def launch_files_app(files_aumid, folder_path):
 def main():
     global should_exit
 
-    files_aumid = "49306atecsolution.FilesUWP_et10x9a9vyk8t!App" # https://www.reddit.com/r/Intune/comments/1adzwux/get_aumid_for_any_app_or_exe_to_use_for_kiosk/?tl=pt-br
+    files_aumid = get_files_aumid()
     processed_hwnds = set() # A set to keep track of already processed window handles.
 
     print("Monitoring for Explorer windows...")
